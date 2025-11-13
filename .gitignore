@@ -1,0 +1,52 @@
+# Python
+backend/.venv/
+__pycache__/
+*.py[cod]
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+*.egg
+.pytest_cache/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Environment variables
+.env
+backend/.env
+frontend/.env
+*.env.local
+*.env.*.local
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+dist/
+build/
+.next/
+out/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Data files (large/generated)
+data/raw/
+data/processed/
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db

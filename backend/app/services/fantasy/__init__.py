@@ -1,0 +1,2 @@
+"""Fantasy cricket services."""
+

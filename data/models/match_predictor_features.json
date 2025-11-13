@@ -1,0 +1,22 @@
+{
+  "feature_names": [
+    "team_win_pct",
+    "opp_win_pct",
+    "delta_win_pct",
+    "team_run_rate",
+    "opp_run_rate",
+    "delta_run_rate",
+    "team_net_run_rate",
+    "opp_net_run_rate",
+    "delta_net_run_rate",
+    "team_avg_runs_for",
+    "opp_avg_runs_for",
+    "delta_avg_runs_for",
+    "team_avg_runs_against",
+    "opp_avg_runs_against",
+    "delta_avg_runs_against",
+    "team_matches",
+    "opp_matches",
+    "delta_matches"
+  ]
+}

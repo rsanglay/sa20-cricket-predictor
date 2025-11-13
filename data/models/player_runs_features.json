@@ -1,0 +1,10 @@
+{
+  "feature_names": [
+    "matches_played",
+    "career_avg_runs",
+    "career_strike_rate",
+    "recent_avg_runs",
+    "recent_strike_rate",
+    "recent_runs_variance"
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "feature_names": [
+    "matches_bowled",
+    "career_avg_wickets",
+    "career_economy",
+    "recent_avg_wickets",
+    "recent_economy",
+    "recent_wickets_variance"
+  ]
+}
