@@ -253,13 +253,36 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
       mergedMatches.push(newMatch)
     }
     
+    // Update currentMatch based on new index
+    let newCurrentMatch = mergedMatches[updates.currentMatchIndex] || null
+    
+    // CRITICAL: If the previous currentMatch was just completed, ensure we use the updated version with result
+    // This handles the case where a match completes but currentMatchIndex hasn't changed yet
+    // or where we want to show the completed match's result before moving to next match
+    if (state.currentMatch && state.currentMatch.id) {
+      // Check if the previous currentMatch is now completed in the merged array
+      const previousMatchUpdated = mergedMatches.find(m => m.id === state.currentMatch!.id)
+      if (previousMatchUpdated && previousMatchUpdated.completed && previousMatchUpdated.result) {
+        // If we're still on the same match index, use the updated version with result
+        if (updates.currentMatchIndex === state.currentMatchIndex) {
+          newCurrentMatch = previousMatchUpdated
+          console.log('[Store] Updating currentMatch with result (same index):', newCurrentMatch.id)
+        }
+        // Also check if the new currentMatch is the same match but without result
+        else if (newCurrentMatch && newCurrentMatch.id === state.currentMatch.id && !newCurrentMatch.result) {
+          newCurrentMatch = previousMatchUpdated
+          console.log('[Store] Syncing currentMatch with completed match result:', newCurrentMatch.id)
+        }
+      }
+    }
+    
     return {
       standings: updates.standings,
       topPerformers: updates.topPerformers,
       currentMatchIndex: updates.currentMatchIndex,
       matches: mergedMatches,
-      // Update currentMatch based on new index
-      currentMatch: mergedMatches[updates.currentMatchIndex] || null,
+      // Update currentMatch - ensure it has the latest result if available
+      currentMatch: newCurrentMatch,
     }
   }),
   

@@ -44,8 +44,14 @@ export const PreMatchOverlay = React.memo(() => {
             key="toss"
             homeTeam={currentMatch.home_team_name}
             awayTeam={currentMatch.away_team_name}
-            tossWinner={currentMatch.toss_winner || 'home'}
-            batFirst={currentMatch.bat_first || 'home'}
+            tossWinner={currentMatch.result?.toss_winner_id 
+              ? (currentMatch.result.toss_winner_id === currentMatch.home_team_id ? 'home' : 'away')
+              : (currentMatch.toss_winner || 'home')}
+            batFirst={currentMatch.result?.toss_decision 
+              ? (currentMatch.result.toss_decision === 'bat' 
+                  ? (currentMatch.result.toss_winner_id === currentMatch.home_team_id ? 'home' : 'away')
+                  : (currentMatch.result.toss_winner_id === currentMatch.home_team_id ? 'away' : 'home'))
+              : (currentMatch.bat_first || 'home')}
           />
         )}
         {preMatchStage === 'lineup-team1' && (

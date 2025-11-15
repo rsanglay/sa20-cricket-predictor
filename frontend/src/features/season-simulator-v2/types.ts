@@ -14,6 +14,32 @@ export type PreMatchStage = 'toss' | 'lineup-team1' | 'lineup-team2' | 'complete
 
 export type SpeedMultiplier = 1 | 2 | 5 | 10
 
+export interface MatchResult {
+  winner_id: number
+  margin: string // "5 wickets", "23 runs", "Super Over"
+  // First innings (team that batted first)
+  first_innings: {
+    team_id: number
+    runs: number
+    wickets: number
+    overs: number
+  }
+  // Second innings (team that chased)
+  second_innings: {
+    team_id: number
+    runs: number
+    wickets: number
+    overs: number
+  }
+  // Toss data
+  toss_winner_id: number
+  toss_decision: 'bat' | 'bowl'
+  // Top performers in this match
+  player_of_match?: string
+  top_scorer?: { name: string, runs: number, balls: number }
+  best_bowler?: { name: string, wickets: number, runs: number }
+}
+
 export interface Match {
   id: number
   match_id: number
@@ -25,16 +51,18 @@ export interface Match {
   venue_name: string
   winner_id?: number
   winner_name?: string
-  home_score?: number
-  away_score?: number
+  home_score?: number // Deprecated: use result instead
+  away_score?: number // Deprecated: use result instead
   home_win_probability?: number
   away_win_probability?: number
   completed: boolean
   match_type?: 'league' | 'semifinal_1' | 'semifinal_2' | 'eliminator' | 'final'
   no_result?: boolean
-  toss_winner?: 'home' | 'away'
-  bat_first?: 'home' | 'away'
+  toss_winner?: 'home' | 'away' // Deprecated: use result.toss_winner_id instead
+  bat_first?: 'home' | 'away' // Deprecated: use result.toss_decision instead
   prediction_data?: any // Full prediction data including lineups
+  // NEW: Simulated match result (generated during simulation)
+  result?: MatchResult
 }
 
 export interface Standing {

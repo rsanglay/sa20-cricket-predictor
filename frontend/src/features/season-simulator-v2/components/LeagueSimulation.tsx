@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion'
+import { useMemo } from 'react'
 import { LiveMatchCard } from './LiveMatchCard'
 import { StandingsTable } from './StandingsTable'
 import { RecentResults } from './RecentResults'
@@ -15,7 +16,26 @@ export const LeagueSimulation = () => {
   const topPerformers = useSimulationStore(state => state.topPerformers)
   const isPreparingMatch = useSimulationStore(state => state.isPreparingMatch)
   
-  const isMatchCompleted = currentMatch?.completed || false
+  // CRITICAL: Always get the latest match from matches array to ensure we have the result
+  // This prevents stale currentMatch from showing predicted scores when result exists
+  const latestMatch = useMemo(() => {
+    if (!currentMatch || !currentMatch.id) return currentMatch
+    
+    const matchFromArray = matches.find(m => m.id === currentMatch.id)
+    if (matchFromArray) {
+      // Always prefer the match from array (it has the latest result)
+      if (matchFromArray.result && matchFromArray.result.first_innings && matchFromArray.result.second_innings) {
+        console.log('[LeagueSimulation] Using match from array with result:', matchFromArray.id, {
+          firstInnings: matchFromArray.result.first_innings.runs,
+          secondInnings: matchFromArray.result.second_innings.runs,
+        })
+      }
+      return matchFromArray
+    }
+    return currentMatch
+  }, [currentMatch, matches])
+  
+  const isMatchCompleted = latestMatch?.completed || false
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-gradient-to-br from-slate-50 to-slate-100 p-8 pb-32">
@@ -28,7 +48,7 @@ export const LeagueSimulation = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
           {/* Main Match Card */}
           <div className="lg:col-span-2">
-            <LiveMatchCard match={currentMatch} isCompleted={isMatchCompleted} />
+            <LiveMatchCard match={latestMatch} isCompleted={isMatchCompleted} allMatches={matches} />
           </div>
 
           {/* Standings */}

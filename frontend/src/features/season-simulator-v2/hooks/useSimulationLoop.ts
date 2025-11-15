@@ -3,6 +3,8 @@ import { useSimulationStore } from '../store/simulationStore'
 import { Match, Standing, TopPerformers } from '../types'
 import { predictionsAPI } from '../../../api/endpoints/predictions'
 import { playersAPI } from '../../../api/endpoints/players'
+import { teamsAPI } from '../../../api/endpoints/teams'
+import { generateRealisticMatchResult } from '../utils/matchResultGenerator'
 
 interface TeamStats {
   wins: number
@@ -410,18 +412,47 @@ export const useSimulationLoop = () => {
         match.venue_id
       )
       
-      // Determine toss winner and bat first from prediction
-      const tossWinner = prediction.toss_winner === 'home' ? 'home' : 'away'
-      const batFirst = prediction.bat_first === 'home' ? 'home' : 'away'
+      // Generate deterministic toss result (same seed as match completion)
+      const seed = match.id
+      let seedState = seed
+      const seededRandom = () => {
+        seedState = ((seedState * 9301) + 49297) % 233280
+        return seedState / 233280
+      }
       
-      // Update match with prediction data
+      // Determine toss winner (50/50) and decision (60% bat first)
+      const tossWinner = seededRandom() < 0.5 ? 'home' : 'away'
+      const tossDecision = seededRandom() < 0.6 ? 'bat' : 'bowl'
+      
+      // Create partial result with toss data (will be completed when match finishes)
+      const partialResult: Match['result'] = {
+        winner_id: 0, // Will be set when match completes
+        margin: '', // Will be set when match completes
+        first_innings: {
+          team_id: 0,
+          runs: 0,
+          wickets: 0,
+          overs: 0,
+        },
+        second_innings: {
+          team_id: 0,
+          runs: 0,
+          wickets: 0,
+          overs: 0,
+        },
+        toss_winner_id: tossWinner === 'home' ? match.home_team_id : match.away_team_id,
+        toss_decision: tossDecision,
+      }
+      
+      // Update match with prediction data and toss result
       const updatedMatch: Match = {
         ...match,
         prediction_data: prediction,
-        toss_winner: tossWinner,
-        bat_first: batFirst,
+        toss_winner: tossWinner, // Keep for backward compatibility
+        bat_first: tossDecision === 'bat' ? tossWinner : (tossWinner === 'home' ? 'away' : 'home'), // Keep for backward compatibility
         home_win_probability: prediction.home_win_probability,
         away_win_probability: prediction.away_win_probability,
+        result: partialResult, // Store toss result early for TossAnimation
       }
       
       // 2. Fetch player images and add to lineup data
@@ -696,19 +727,17 @@ export const useSimulationLoop = () => {
             let winnerId: number | undefined
             let winnerName: string | undefined
             let noResult = false
-            let homeScore: number
-            let awayScore: number
+            let matchResult: Match['result'] | undefined
 
             if (isNoResult) {
               noResult = true
               winnerId = undefined
               winnerName = undefined
-              // For no result, use predicted scores or deterministic random
-              homeScore = prediction.predicted_scores?.home_score || Math.floor(seededRandom() * 50) + 150
-              awayScore = prediction.predicted_scores?.away_score || Math.floor(seededRandom() * 50) + 150
+              matchResult = undefined
             } else {
               // Determine winner first (deterministic based on seed)
               const homeWins = seededRandom() * 100 < homeWinProb
+              const determinedWinner = homeWins ? 'home' : 'away'
               winnerId = homeWins
                 ? matchWithPrediction.home_team_id
                 : matchWithPrediction.away_team_id
@@ -716,23 +745,50 @@ export const useSimulationLoop = () => {
                 ? matchWithPrediction.home_team_name
                 : matchWithPrediction.away_team_name
 
-              // Get base scores from prediction (use deterministic seeded random)
-              const baseHomeScore = prediction.predicted_scores?.home_score || Math.floor(seededRandom() * 50) + 150
-              const baseAwayScore = prediction.predicted_scores?.away_score || Math.floor(seededRandom() * 50) + 150
+              // Fetch teams data for result generation
+              try {
+                const teams = await teamsAPI.getAll()
+                const homeTeam = teams.find((t: { id: number }) => t.id === matchWithPrediction.home_team_id)
+                const awayTeam = teams.find((t: { id: number }) => t.id === matchWithPrediction.away_team_id)
 
-              // Ensure scores match the winner: winner must have higher score
-              if (homeWins) {
-                // Home wins - ensure home_score > away_score
-                homeScore = baseHomeScore
-                awayScore = Math.min(baseAwayScore, homeScore - 1) // Away score must be less
-              } else {
-                // Away wins - ensure away_score > home_score
-                awayScore = baseAwayScore
-                homeScore = Math.min(baseHomeScore, awayScore - 1) // Home score must be less
+                if (homeTeam && awayTeam) {
+                  // Generate realistic match result
+                  // Use the same seeded random state to ensure consistency
+                  // Reset seed state to match ID (same as in prepareMatch)
+                  seedState = seed
+                  
+                  matchResult = generateRealisticMatchResult({
+                    homeTeam: { id: homeTeam.id, name: homeTeam.name, short_name: homeTeam.short_name },
+                    awayTeam: { id: awayTeam.id, name: awayTeam.name, short_name: awayTeam.short_name },
+                    prediction: {
+                      home_win_probability: homeWinProb,
+                      away_win_probability: 100 - homeWinProb,
+                    },
+                    determinedWinner,
+                    venue: {
+                      id: matchWithPrediction.venue_id,
+                      avg_first_innings_score: null, // We'll use default in generator
+                    },
+                    seededRandom,
+                    // Use existing toss result from match preparation
+                    existingTossResult: matchToUpdate.result?.toss_winner_id && matchToUpdate.result?.toss_decision
+                      ? {
+                          toss_winner_id: matchToUpdate.result.toss_winner_id,
+                          toss_decision: matchToUpdate.result.toss_decision,
+                        }
+                      : undefined,
+                  })
+
+                  console.log('[Match] Generated match result:', matchResult)
+                } else {
+                  console.warn('[Match] Could not find teams for result generation')
+                }
+              } catch (error) {
+                console.error('[Match] Error fetching teams for result generation:', error)
               }
             }
             
-            console.log('[Match] Calculated deterministic result for match:', matchWithPrediction.id, 'Winner:', winnerName, 'Score:', homeScore, 'vs', awayScore)
+            console.log('[Match] Calculated deterministic result for match:', matchWithPrediction.id, 'Winner:', winnerName, 'Result:', matchResult)
 
             // Update match with result (create immutable copy)
             const updatedMatch: Match = {
@@ -740,9 +796,19 @@ export const useSimulationLoop = () => {
               completed: true,
               winner_id: winnerId,
               winner_name: winnerName,
-              home_score: homeScore,
-              away_score: awayScore,
+              // Keep legacy scores for backward compatibility, but prefer result
+              home_score: matchResult 
+                ? (matchResult.first_innings.team_id === matchWithPrediction.home_team_id 
+                    ? matchResult.first_innings.runs 
+                    : matchResult.second_innings.runs)
+                : undefined,
+              away_score: matchResult
+                ? (matchResult.first_innings.team_id === matchWithPrediction.away_team_id
+                    ? matchResult.first_innings.runs
+                    : matchResult.second_innings.runs)
+                : undefined,
               no_result: noResult,
+              result: matchResult,
             }
             
             console.log('[Match] Completing match:', updatedMatch.id, 'Winner:', updatedMatch.winner_name, 'Score:', updatedMatch.home_score, 'vs', updatedMatch.away_score)
